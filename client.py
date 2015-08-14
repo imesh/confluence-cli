@@ -77,18 +77,6 @@ def get_content_by_title(url, title):
     
 top_page_url = '/rest/api/content'
 top_page = get_content_by_title(top_page_url, 'Stratos 4.1.0')
-
 children_url = top_page.json()['results'][0]['_expandable']['children']
-
 children = get_content_recursively(children_url)
-
-
-#parentPage = r.json()['results'][0]
-#pageData = {'type':'comment', 'container':parentPage,
-#	'body':{'storage':{'value':"<p>A new comment</p>",'representation':'storage'}}}
-#r = requests.post('http://localhost:8080/confluence/rest/api/content',
-#	data=json.dumps(pageData),
-#	auth=('admin','admin'),
-#	headers=({'Content-Type':'application/json'}))
-#printResponse(r)
 
