@@ -1,10 +1,12 @@
-# Confluence Client
+## Confluence Client
+This is a confluence client for querying and updating content in Confluence.
 
-## How to run
-Install python dependencies
+### How to run
+1. Install python dependencies
+
 '''
 pip install requests
 '''
 
-Run client
+2. Run client
 python client.py
