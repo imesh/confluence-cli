@@ -21,9 +21,9 @@
 import requests, json as json, getpass, sys, logging as log
 
 endpoint = 'https://cwiki.apache.org/confluence'
+space = 'STRATOS'
 username = None
 password = None
-space = 'STRATOS'
 trace = False
 
 log.basicConfig(level=log.WARNING)
