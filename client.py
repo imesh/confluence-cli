@@ -1,4 +1,5 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,9 @@
 #     specific language governing permissions and limitations
 # under the License.
 
-import requests, json, getpass, sys, logging as log
+import requests, json as json, getpass, sys, logging as log, html
 
-confluence_url = 'https://cwiki.apache.org/confluence'
+endpoint = 'https://cwiki.apache.org/confluence'
 username = None
 password = None
 space = 'STRATOS'
@@ -42,7 +43,7 @@ def authenticate():
         password = getpass.getpass()
 
     print 'Authenticating...'
-    url = confluence_url + '/rest/api/content'
+    url = endpoint + '/rest/api/content'
     r = requests.get(url,
                      params={'spaceKey': space},
                      auth=(username, password))
@@ -65,12 +66,16 @@ def printResponse(r):
     """
 
     if (trace == 'true' and r is not None):
-        print '{} {}\n'.format(json.dumps(r.json(), sort_keys=True, indent=4, separators=(',', ': ')), r)
+        print generate_json(r)
 
 
-def get_content_recursively(url):
+def generate_json(r):
+    return '{} {}\n'.format(json.dumps(r.json(), sort_keys=True, indent=4, separators=(',', ': ')), r)
+
+
+def traverse_recursively(url, find_text, replace_text):
     """
-    GET content recursively with the given URL.
+    Traverse content recursively with the given URL.
     :param url:
     :return:
     """
@@ -98,19 +103,21 @@ def get_content_recursively(url):
                 try:
                     title = item['title']
                     print '=== ' + title + ' ==='
-                    # body = item['body']['view']['value']
+                    if(find_text is not None and replace_text is not None):
+                        print 'Updating page: ' + title
+                        update_page(item, find_text, replace_text)
                 except KeyError:
                     pass
 
-                process_expandable_element(expandable_element)
+                process_expandable_element(expandable_element, find_text, replace_text)
             except KeyError:
                 pass
         return
     else:
-        process_expandable_element(expandable_element)
+        process_expandable_element(expandable_element, find_text, replace_text)
 
 
-def process_expandable_element(expandable_element):
+def process_expandable_element(expandable_element, find_text, replace_text):
     """
     Process expandable element and invoke get_content_recursively() for each.
     :param expandable_element:
@@ -119,9 +126,9 @@ def process_expandable_element(expandable_element):
 
     for key, value in expandable_element.iteritems():
         if key == 'page':
-            get_content_recursively(value)
+            traverse_recursively(value, find_text, replace_text)
         if key == 'children':
-            get_content_recursively(value)
+            traverse_recursively(value, find_text, replace_text)
 
 
 def get_content(url, title=None, expand=None):
@@ -134,24 +141,55 @@ def get_content(url, title=None, expand=None):
     :return: HTTP response
     """
 
-    url = confluence_url + url
+    url = endpoint + url
     r = requests.get(url,
                      params={'spaceKey': space, 'title': title, 'expand': expand},
                      auth=(username, password))
     printResponse(r)
     return r
 
+def update_content(url, data):
+    """
+    Update content
+    :param url: content URL
+    :param data: data to be updated
+    :return:
+    """
+    if(trace == 'true'):
+        print 'Updating ' + url
+        print data
 
-print '------------------------------------------'
+    url = endpoint + url
+    headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+    r = requests.put(url,
+                 data,
+                 headers=headers,
+                 auth=(username, password))
+
+    print_line()
+    print 'Status Code: ' + str(r.status_code)
+    print_line()
+    if(r.status_code != 200):
+        print 'ERROR: ' + r._content
+        print_line()
+    return r
+
+def print_line():
+    line = ''
+    for i in range(1, 50):
+        line = '-' + line
+    print line
+
+print_line()
 print 'Confluence Client'
-print '------------------------------------------'
+print_line()
 
 add_line = False
-if confluence_url is not None:
-    print 'URL: ' + confluence_url
+if endpoint is not None:
+    print 'Endpoint: ' + endpoint
     add_line = True
 else:
-    confluence_url = raw_input('Confluence endpoint: ')
+    endpoint = raw_input('Confluence endpoint: ')
 if space is not None:
     print 'Space: ' + space
     add_line = True
@@ -159,7 +197,7 @@ else:
     space = raw_input('Space: ')
 
 if add_line:
-    print '------------------------------------------'
+    print_line()
 
 
 while authenticate() == False:
@@ -172,46 +210,47 @@ def print_menu():
     """
 
     print ''
-    print '------------------------------------------'
+    print_line()
     print 'Confluence Client Menu'
-    print '------------------------------------------'
+    print_line()
     print '1: Find Pages Recursively'
     print '2: Find and Replace Text'
     print '3: Exit'
-    print '------------------------------------------'
+    print_line()
     print ''
     menu_no = raw_input('Select a menu item: ')
     return menu_no
 
 
-def find_pages_recursively():
+def find_pages_recursively(find_text = None, replace_text = None):
     """
     Find pages recursively and print their titles
     :return:
     """
 
     print ''
-    print '------------------------------------------'
+    print_line()
     print 'Find Pages Recursively'
-    print '------------------------------------------'
+    print_line()
     title = raw_input('Enter page title: ')
     content_url = '/rest/api/content'
     response = get_content(content_url, title)
     json = response.json()
 
-    if(int(json['size']) > 0):
-        children_url = json['results'][0]['_expandable']['children']
-        print ''
-        try:
-            children = get_content_recursively(children_url)
-            return True
-        except KeyboardInterrupt:
-            print 'Interrupted!'
-            return False
-    else:
+    if(int(json['size']) == 0):
         print 'Could not find a page with the title \'' + title + '\''
         raw_input("Press any key to continue...")
         return False
+
+    children_url = json['results'][0]['_expandable']['children']
+    print ''
+    try:
+        traverse_recursively(children_url, find_text, replace_text)
+        return True
+    except KeyboardInterrupt:
+        print 'Interrupted!'
+        return False
+
 
 def find_and_replace_text():
     """
@@ -220,15 +259,60 @@ def find_and_replace_text():
     """
 
     print ''
-    print '------------------------------------------'
+    print_line()
     print 'Find and Replace Text'
-    print '------------------------------------------'
-    top_page_title = raw_input('Enter page title: ')
+    print_line()
+    title = raw_input('Enter page title: ')
+
+    expand = 'space,body.view,version'
+    content_url = '/rest/api/content'
+    response = get_content(content_url, title, expand)
+    json_dict = response.json();
+    if(int(json_dict['size']) == 0):
+        print 'Could not find a page with the title \'' + title + '\''
+        raw_input("Press any key to continue...")
+        return
+
     find_text = raw_input('Find text: ')
     replace_text = raw_input('Replace with: ')
-    expand = 'space,body.view'
-    content_url = '/rest/api/content'
-    top_page = get_content(content_url, top_page_title, expand)
+
+    page = json_dict["results"][0]
+    update_page(page, find_text, replace_text)
+
+    children_url = json_dict['results'][0]['_expandable']['children']
+    traverse_recursively(children_url, find_text, replace_text)
+
+def update_page(page, find_text, replace_text):
+    """
+    Update page by replacing text
+    :param page:
+    :param find_text:
+    :param replace_text:
+    :return:
+    """
+    url = page['body']['view']['_expandable']['content']
+    body = page['body']['view']['value']
+    # Update page body
+
+    # regexp = "&.+?;"
+    # list_of_html = re.findall(regexp, body) #finds all html entites in page
+    # for e in list_of_html:
+    #     h = HTMLParser.HTMLParser()
+    #     unescaped = h.unescape(e) #finds the unescaped value of the html entity
+    #     body = body.replace(e, unescaped)
+
+    body = body.replace(find_text, replace_text)
+
+    page['body']['storage'] = {"value": body, "representation": "storage"}
+    page['body']['view']['value'] = None
+    # Update version
+    version = page['version']
+    version['number'] = int(version['number']) + 1
+    page['version'] = version
+    page['version']['by'] = None
+    page['version']['message'] = 'Replacing text ' + find_text + ' with ' + replace_text
+    json_dict = json.dumps(page, ensure_ascii=False).encode('utf-8')
+    update_content(url, json_dict)
 
 
 def load_menu():
@@ -240,6 +324,9 @@ def load_menu():
     menu_no = print_menu()
     if (menu_no == '1'):
         find_pages_recursively()
+        load_menu()
+    elif (menu_no == '2'):
+        find_and_replace_text()
         load_menu()
     elif (menu_no == '3'):
         sys.exit(0)
