@@ -12,7 +12,6 @@ Install python dependencies:
 
 ```
 pip install requests[security]
-pip install html
 ```
 
 Execute client:

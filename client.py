@@ -18,13 +18,13 @@
 #     specific language governing permissions and limitations
 # under the License.
 
-import requests, json as json, getpass, sys, logging as log, html
+import requests, json as json, getpass, sys, logging as log
 
 endpoint = 'https://cwiki.apache.org/confluence'
 username = None
 password = None
 space = 'STRATOS'
-trace = 'false'
+trace = False
 
 log.basicConfig(level=log.WARNING)
 
@@ -65,7 +65,7 @@ def printResponse(r):
     :return:
     """
 
-    if (trace == 'true' and r is not None):
+    if (trace == True and r is not None):
         print generate_json(r)
 
 
@@ -73,7 +73,7 @@ def generate_json(r):
     return '{} {}\n'.format(json.dumps(r.json(), sort_keys=True, indent=4, separators=(',', ': ')), r)
 
 
-def traverse_recursively(url, find_text, replace_text):
+def traverse_recursively(url, find_text, replace_text, expand = None):
     """
     Traverse content recursively with the given URL.
     :param url:
@@ -82,7 +82,7 @@ def traverse_recursively(url, find_text, replace_text):
 
     log.debug('traverse_recursively: ' + url + ' [find] ' + find_text + ' [replace] ' + replace_text)
 
-    r = get_content(url)
+    r = get_content(url, expand = expand)
     json = r.json()
     expandable_element = None
 
@@ -112,15 +112,15 @@ def traverse_recursively(url, find_text, replace_text):
                     print 'Error: Could not update page ' + title
                     print e
 
-                process_expandable_element(expandable_element, find_text, replace_text)
+                process_expandable_element(expandable_element, find_text, replace_text, expand)
             except KeyError:
                 pass
         return
     else:
-        process_expandable_element(expandable_element, find_text, replace_text)
+        process_expandable_element(expandable_element, find_text, replace_text, expand)
 
 
-def process_expandable_element(expandable_element, find_text, replace_text):
+def process_expandable_element(expandable_element, find_text, replace_text, expand = None):
     """
     Process expandable element and invoke get_content_recursively() for each.
     :param expandable_element:
@@ -129,9 +129,9 @@ def process_expandable_element(expandable_element, find_text, replace_text):
 
     for key, value in expandable_element.iteritems():
         if key == 'page':
-            traverse_recursively(value, find_text, replace_text)
+            traverse_recursively(value, find_text, replace_text, expand)
         if key == 'children':
-            traverse_recursively(value, find_text, replace_text)
+            traverse_recursively(value, find_text, replace_text, expand)
 
 
 def get_content(url, title=None, expand=None):
@@ -143,6 +143,9 @@ def get_content(url, title=None, expand=None):
     to expand body of the content
     :return: HTTP response
     """
+
+    if(trace == True):
+        print 'get_content: [title] ' + str(title) + ' [expand] ' + str(expand)
 
     url = endpoint + url
     r = requests.get(url,
@@ -260,7 +263,7 @@ def find_and_replace_text():
     update_page(page, find_text, replace_text)
     children_url = json_dict['results'][0]['_expandable']['children']
     try:
-        traverse_recursively(children_url, find_text, replace_text)
+        traverse_recursively(children_url, find_text, replace_text, expand)
         return True
     except KeyboardInterrupt:
         print 'Interrupted!'
@@ -331,7 +334,7 @@ def update_content(url, data):
     :param data: data to be updated
     :return:
     """
-    if(trace == 'true'):
+    if(trace == True):
         print 'Updating ' + url
         print data
 
