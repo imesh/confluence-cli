@@ -80,7 +80,7 @@ def traverse_recursively(url, find_text, replace_text, expand = None):
     :return:
     """
 
-    log.debug('traverse_recursively: ' + url + ' [find] ' + find_text + ' [replace] ' + replace_text)
+    log.debug('traverse_recursively: ' + str(url) + ' [find] ' + str(find_text) + ' [replace] ' + str(replace_text))
 
     r = get_content(url, expand = expand)
     json = r.json()
