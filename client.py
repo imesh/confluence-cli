@@ -26,7 +26,7 @@ password = None
 space = 'STRATOS'
 trace = 'false'
 
-log.basicConfig(level=log.WARN)
+log.basicConfig(level=log.WARNING)
 
 def authenticate():
     """
@@ -80,21 +80,23 @@ def traverse_recursively(url, find_text, replace_text):
     :return:
     """
 
+    log.debug('traverse_recursively: ' + url + ' [find] ' + find_text + ' [replace] ' + replace_text)
+
     r = get_content(url)
     json = r.json()
     expandable_element = None
 
     try:
         expandable_element = json['_expandable']
-        title = json['title']
-        print '=== ' + title + ' ==='
     except KeyError:
+        log.debug('_expandable element not found')
         pass
 
     if expandable_element is None:
         try:
             results_element = r.json()['results']
         except KeyError:
+            log.debug('results element not found')
             pass
 
         for item in results_element:
@@ -102,12 +104,13 @@ def traverse_recursively(url, find_text, replace_text):
                 expandable_element = item['_expandable']
                 try:
                     title = item['title']
-                    print '=== ' + title + ' ==='
                     if(find_text is not None and replace_text is not None):
-                        print 'Updating page: ' + title
                         update_page(item, find_text, replace_text)
-                except KeyError:
-                    pass
+                    else:
+                        print 'Found page: ' + title
+                except Exception as e:
+                    print 'Error: Could not update page ' + title
+                    print e
 
                 process_expandable_element(expandable_element, find_text, replace_text)
             except KeyError:
@@ -148,31 +151,6 @@ def get_content(url, title=None, expand=None):
     printResponse(r)
     return r
 
-def update_content(url, data):
-    """
-    Update content
-    :param url: content URL
-    :param data: data to be updated
-    :return:
-    """
-    if(trace == 'true'):
-        print 'Updating ' + url
-        print data
-
-    url = endpoint + url
-    headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
-    r = requests.put(url,
-                 data,
-                 headers=headers,
-                 auth=(username, password))
-
-    print_line()
-    print 'Status Code: ' + str(r.status_code)
-    print_line()
-    if(r.status_code != 200):
-        print 'ERROR: ' + r._content
-        print_line()
-    return r
 
 def print_line():
     line = ''
@@ -237,11 +215,13 @@ def find_pages_recursively(find_text = None, replace_text = None):
     response = get_content(content_url, title)
     json = response.json()
 
+    print ''
     if(int(json['size']) == 0):
         print 'Could not find a page with the title \'' + title + '\''
         raw_input("Press any key to continue...")
         return False
 
+    print 'Found page: ' + title
     children_url = json['results'][0]['_expandable']['children']
     print ''
     try:
@@ -275,12 +255,16 @@ def find_and_replace_text():
 
     find_text = raw_input('Find text: ')
     replace_text = raw_input('Replace with: ')
-
     page = json_dict["results"][0]
-    update_page(page, find_text, replace_text)
 
+    update_page(page, find_text, replace_text)
     children_url = json_dict['results'][0]['_expandable']['children']
-    traverse_recursively(children_url, find_text, replace_text)
+    try:
+        traverse_recursively(children_url, find_text, replace_text)
+        return True
+    except KeyboardInterrupt:
+        print 'Interrupted!'
+        return False
 
 def update_page(page, find_text, replace_text):
     """
@@ -290,8 +274,23 @@ def update_page(page, find_text, replace_text):
     :param replace_text:
     :return:
     """
-    url = page['body']['view']['_expandable']['content']
-    body = page['body']['view']['value']
+
+    title = page['title']
+    print ''
+    print 'Updating page ' + title + '...'
+
+    try:
+        body = page['body']['view']['value']
+    except KeyError:
+        print 'Could not update page, body not found: ' + title
+        return
+
+    try:
+        url = page['body']['view']['_expandable']['content']
+    except KeyError:
+        print 'Could not update page, content URL not found: ' + title
+        return
+
     # Update page body
 
     # regexp = "&.+?;"
@@ -312,7 +311,37 @@ def update_page(page, find_text, replace_text):
     page['version']['by'] = None
     page['version']['message'] = 'Replacing text ' + find_text + ' with ' + replace_text
     json_dict = json.dumps(page, ensure_ascii=False).encode('utf-8')
-    update_content(url, json_dict)
+
+    try:
+        response = update_content(url, json_dict)
+        if(response.status_code == 200):
+            print 'Page ' + title + ' updated successfully: [' + find_text +'] -> [' + replace_text + ']'
+            return
+        else:
+            print 'Could not update page ' + title
+            print response._content
+    except Exception as e:
+        log.error('Could not update page ' + title, e)
+
+
+def update_content(url, data):
+    """
+    Update content
+    :param url: content URL
+    :param data: data to be updated
+    :return:
+    """
+    if(trace == 'true'):
+        print 'Updating ' + url
+        print data
+
+    url = endpoint + url
+    headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+    r = requests.put(url,
+                     data,
+                     headers=headers,
+                     auth=(username, password))
+    return r
 
 
 def load_menu():

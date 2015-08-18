@@ -2,10 +2,17 @@
 This is a confluence client for querying and updating content in Confluence.
 
 ### How to run
+Install pip:
+
+```
+sudo easy_install pip
+```
+
 Install python dependencies:
 
 ```
-pip install requests
+pip install requests[security]
+pip install html
 ```
 
 Execute client:
