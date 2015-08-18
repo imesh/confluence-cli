@@ -73,7 +73,7 @@ def generate_json(r):
     return '{} {}\n'.format(json.dumps(r.json(), sort_keys=True, indent=4, separators=(',', ': ')), r)
 
 
-def traverse_recursively(url, find_text, replace_text, expand = None):
+def traverse_recursively(url, find_text, replace_text, expand = None, update_title = False):
     """
     Traverse content recursively with the given URL.
     :param url:
@@ -105,22 +105,22 @@ def traverse_recursively(url, find_text, replace_text, expand = None):
                 try:
                     title = item['title']
                     if(find_text is not None and replace_text is not None):
-                        update_page(item, find_text, replace_text)
+                        update_page(title, item, find_text, replace_text, update_title = update_title)
                     else:
                         print 'Found page: ' + title
                 except Exception as e:
                     print 'Error: Could not update page ' + title
                     print e
 
-                process_expandable_element(expandable_element, find_text, replace_text, expand)
+                process_expandable_element(expandable_element, find_text, replace_text, expand, update_title)
             except KeyError:
                 pass
         return
     else:
-        process_expandable_element(expandable_element, find_text, replace_text, expand)
+        process_expandable_element(expandable_element, find_text, replace_text, expand, update_title)
 
 
-def process_expandable_element(expandable_element, find_text, replace_text, expand = None):
+def process_expandable_element(expandable_element, find_text, replace_text, expand = None, update_title = False):
     """
     Process expandable element and invoke get_content_recursively() for each.
     :param expandable_element:
@@ -129,9 +129,9 @@ def process_expandable_element(expandable_element, find_text, replace_text, expa
 
     for key, value in expandable_element.iteritems():
         if key == 'page':
-            traverse_recursively(value, find_text, replace_text, expand)
+            traverse_recursively(value, find_text, replace_text, expand, update_title)
         if key == 'children':
-            traverse_recursively(value, find_text, replace_text, expand)
+            traverse_recursively(value, find_text, replace_text, expand, update_title)
 
 
 def get_content(url, title=None, expand=None):
@@ -195,8 +195,9 @@ def print_menu():
     print 'Confluence Client Menu'
     print_line()
     print '1: Find Pages Recursively'
-    print '2: Find and Replace Text'
-    print '3: Exit'
+    print '2: Find and Replace Page Titles'
+    print '3: Find and Replace Text'
+    print '4: Exit'
     print_line()
     print ''
     menu_no = raw_input('Select a menu item: ')
@@ -234,6 +235,41 @@ def find_pages_recursively(find_text = None, replace_text = None):
         return False
 
 
+def find_and_replace_page_titles():
+    """
+    Find and replace text in pages recursively
+    :return:
+    """
+
+    print ''
+    print_line()
+    print 'Find and Replace Page Titles'
+    print_line()
+    title = raw_input('Enter page title: ')
+
+    content_url = '/rest/api/content'
+    expand = 'space,title,version'
+    response = get_content(content_url, title, expand)
+    json_dict = response.json();
+    if(int(json_dict['size']) == 0):
+        print 'Could not find a page with the title \'' + title + '\''
+        raw_input("Press any key to continue...")
+        return
+
+    find_text = raw_input('Find text: ')
+    replace_text = raw_input('Replace with: ')
+    page = json_dict["results"][0]
+
+    update_page(title, page, find_text, replace_text, update_title = True)
+    children_url = json_dict['results'][0]['_expandable']['children']
+    try:
+        traverse_recursively(children_url, find_text, replace_text, expand, update_title = True)
+        return True
+    except KeyboardInterrupt:
+        print 'Interrupted!'
+        return False
+
+
 def find_and_replace_text():
     """
     Find and replace text in pages recursively
@@ -259,7 +295,7 @@ def find_and_replace_text():
     replace_text = raw_input('Replace with: ')
     page = json_dict["results"][0]
 
-    update_page(page, find_text, replace_text)
+    update_page(title, page, find_text, replace_text)
     children_url = json_dict['results'][0]['_expandable']['children']
     try:
         traverse_recursively(children_url, find_text, replace_text, expand)
@@ -268,7 +304,8 @@ def find_and_replace_text():
         print 'Interrupted!'
         return False
 
-def update_page(page, find_text, replace_text):
+
+def update_page(title, page, find_text, replace_text, update_title = False):
     """
     Update page by replacing text
     :param page:
@@ -277,37 +314,36 @@ def update_page(page, find_text, replace_text):
     :return:
     """
 
-    title = page['title']
     print ''
-    print 'Updating page \'' + title + '\'...'
 
-    try:
-        body = page['body']['storage']['value']
-    except KeyError:
-        print 'Could not update page, body not found: ' + title
-        return
+    if(update_title):
+        # Update page title
+        print 'Updating page title \'' + title + '\'...'
+        if find_text not in title:
+            print 'Page title not updated, text \'' + find_text + '\' not found in page title'
+            return
+        page['title'] = title.replace(find_text, replace_text)
+        url = page['_links']['self'].replace(endpoint, "")
+    else:
+        # Update page body
+        print 'Updating page \'' + title + '\'...'
+        try:
+            body = page['body']['storage']['value']
+        except KeyError:
+            print 'Could not update page, body not found: ' + title
+            return
 
-    try:
-        url = page['body']['storage']['_expandable']['content']
-    except KeyError:
-        print 'Could not update page, content URL not found: ' + title
-        return
-
-    # Update page body
-
-    # regexp = "&.+?;"
-    # list_of_html = re.findall(regexp, body) #finds all html entites in page
-    # for e in list_of_html:
-    #     h = HTMLParser.HTMLParser()
-    #     unescaped = h.unescape(e) #finds the unescaped value of the html entity
-    #     body = body.replace(e, unescaped)
-
-    if find_text not in body:
-        print 'Page not updated, text \'' + find_text + '\' not found'
-        return
-
-    body = body.replace(find_text, replace_text)
-    page['body']['storage'] = {"value": body, "representation": "storage"}
+        try:
+            url = page['body']['storage']['_expandable']['content']
+        except KeyError:
+            print 'Could not update page, content URL not found: ' + title
+            return
+        if find_text not in body:
+            print 'Page not updated, text \'' + find_text + '\' not found in page body'
+            return
+        else:
+            body = body.replace(find_text, replace_text)
+            page['body']['storage'] = {"value": body, "representation": "storage"}
 
     # Update version
     version = page['version']
@@ -326,7 +362,7 @@ def update_page(page, find_text, replace_text):
             print 'Could not update page ' + title
             print response._content
     except Exception as e:
-        log.error('Could not update page ' + title, e)
+        print 'Could not update page ' + title, e
 
 
 def update_content(url, data):
@@ -364,11 +400,17 @@ def load_menu():
             print 'Interrupted!'
     elif (menu_no == '2'):
         try:
-            find_and_replace_text()
+            find_and_replace_page_titles()
             load_menu()
         except KeyboardInterrupt:
             print 'Interrupted!'
     elif (menu_no == '3'):
+        try:
+            find_and_replace_text()
+            load_menu()
+        except KeyboardInterrupt:
+            print 'Interrupted!'
+    elif (menu_no == '4'):
         sys.exit(0)
     else:
         print 'An invalid option!'
