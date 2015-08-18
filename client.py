@@ -139,7 +139,7 @@ def get_content(url, title=None, expand=None):
     GET content with the given URL,
     :param url: content URL
     :param title: title of the content, default is None
-    :param expand: items to be expanded; for an example use 'space,body.view'
+    :param expand: items to be expanded; for an example use 'space,body.storage'
     to expand body of the content
     :return: HTTP response
     """
@@ -247,7 +247,7 @@ def find_and_replace_text():
     print_line()
     title = raw_input('Enter page title: ')
 
-    expand = 'space,body.view,version'
+    expand = 'space,body.storage,version'
     content_url = '/rest/api/content'
     response = get_content(content_url, title, expand)
     json_dict = response.json();
@@ -283,13 +283,13 @@ def update_page(page, find_text, replace_text):
     print 'Updating page \'' + title + '\'...'
 
     try:
-        body = page['body']['view']['value']
+        body = page['body']['storage']['value']
     except KeyError:
         print 'Could not update page, body not found: ' + title
         return
 
     try:
-        url = page['body']['view']['_expandable']['content']
+        url = page['body']['storage']['_expandable']['content']
     except KeyError:
         print 'Could not update page, content URL not found: ' + title
         return
@@ -308,9 +308,8 @@ def update_page(page, find_text, replace_text):
         return
 
     body = body.replace(find_text, replace_text)
-
     page['body']['storage'] = {"value": body, "representation": "storage"}
-    page['body']['view']['value'] = None
+
     # Update version
     version = page['version']
     version['number'] = int(version['number']) + 1
@@ -359,11 +358,17 @@ def load_menu():
 
     menu_no = print_menu()
     if (menu_no == '1'):
-        find_pages_recursively()
-        load_menu()
+        try:
+            find_pages_recursively()
+            load_menu()
+        except KeyboardInterrupt:
+            print 'Interrupted!'
     elif (menu_no == '2'):
-        find_and_replace_text()
-        load_menu()
+        try:
+            find_and_replace_text()
+            load_menu()
+        except KeyboardInterrupt:
+            print 'Interrupted!'
     elif (menu_no == '3'):
         sys.exit(0)
     else:
