@@ -226,7 +226,6 @@ def find_pages_recursively(find_text = None, replace_text = None):
 
     print 'Found page: ' + title
     children_url = json['results'][0]['_expandable']['children']
-    print ''
     try:
         traverse_recursively(children_url, find_text, replace_text)
         return True
