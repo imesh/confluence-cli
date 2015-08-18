@@ -280,7 +280,7 @@ def update_page(page, find_text, replace_text):
 
     title = page['title']
     print ''
-    print 'Updating page ' + title + '...'
+    print 'Updating page \'' + title + '\'...'
 
     try:
         body = page['body']['view']['value']
@@ -303,6 +303,10 @@ def update_page(page, find_text, replace_text):
     #     unescaped = h.unescape(e) #finds the unescaped value of the html entity
     #     body = body.replace(e, unescaped)
 
+    if find_text not in body:
+        print 'Page not updated, text \'' + find_text + '\' not found'
+        return
+
     body = body.replace(find_text, replace_text)
 
     page['body']['storage'] = {"value": body, "representation": "storage"}
@@ -318,7 +322,7 @@ def update_page(page, find_text, replace_text):
     try:
         response = update_content(url, json_dict)
         if(response.status_code == 200):
-            print 'Page ' + title + ' updated successfully: [' + find_text +'] -> [' + replace_text + ']'
+            print 'Page \'' + title + '\' updated successfully: [' + find_text +'] -> [' + replace_text + ']'
             return
         else:
             print 'Could not update page ' + title
@@ -363,7 +367,7 @@ def load_menu():
     elif (menu_no == '3'):
         sys.exit(0)
     else:
-        print 'Sorry this feature is still not implemented'
+        print 'An invalid option!'
         raw_input("Press any key to continue...")
         load_menu()
 
