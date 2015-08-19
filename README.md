@@ -25,8 +25,9 @@ This is a confluence client for querying and updating content in Confluence.
    Confluence Client Menu
    -------------------------------------------------
    1: Find Pages Recursively
-   2: Find and Replace Text
-   3: Exit
+   2: Find and Replace Page Titles
+   3: Find and Replace Text
+   4: Exit
    -------------------------------------------------
    
    Select a menu item: 1
