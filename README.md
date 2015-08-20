@@ -1,5 +1,5 @@
-## Confluence Client
-This is a confluence client for querying and updating content in Confluence.
+## Confluence CLI
+A CLI for executing basic operations of Confluence remotely.
 
 ### How to run
 1. Install pip by following this [guide](https://pip.pypa.io/en/latest/installing.html#install-pip):
